@@ -10,7 +10,6 @@ def pdf_to_tokens(path: str) -> list:
 
 
 class DocBankNoImageDataset(Dataset):
-
     @staticmethod
     def get_vocab(labels: list[str]) -> tuple[dict]:
 
@@ -33,7 +32,8 @@ class DocBankNoImageDataset(Dataset):
         assert os.path.isdir(self.data_dir)
 
         for path in os.listdir(self.data_dir)[:100]:
-            if os.path.isfile(os.path.join(self.data_dir, path)):
+            
+            if os.path.isfile(os.path.join(self.data_dir, path)) and path[-3:] == 'txt':
                 self.data.append(os.path.join(self.data_dir, path))
 
         words = []
@@ -45,7 +45,7 @@ class DocBankNoImageDataset(Dataset):
                 lines = f.readlines()
                 data = [line.split('\t') for line in lines]
                 line_words = [line[0] for line in data]
-                line_bboxes = [line[1:5] for line in data]
+                line_bboxes = [[int(coord) for coord in line[1:5]] for line in data]
                 line_labels = [line[-1] for line in data]
                 words.append(line_words)
                 bboxes.append(line_bboxes)

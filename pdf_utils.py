@@ -1,6 +1,6 @@
 import pdfplumber
 import os
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 import pdf2image
 from pdfminer.layout import LTChar, LTLine
@@ -8,6 +8,7 @@ import re
 from tqdm import tqdm
 from collections import Counter
 
+COLORS = ['blue', 'green', 'orange', 'violet', 'red', 'brown']
 data_dir = os.path.join('data', 'spbu', 'pdf')
 poppler_path = r"C:\poppler-24.02.0\Library\bin"
 
@@ -150,3 +151,20 @@ def extract_pages_from_pdf(data_dir, path):
         tokens = extract_tokens_from_page(page)
         save_tokens(tokens, page_num, pdf_dir, pdf_name)
     return
+
+def plot_page(img_path, bboxes, labels, id2label=None):
+    image = Image.open(img_path).convert("RGB")
+    draw = ImageDraw.Draw(image, "RGBA")
+    font = ImageFont.load_default()
+
+    for box, label in zip(bboxes, labels):
+        general_box = box.copy()
+        general_box[0] *= 1.7
+        general_box[2] *= 1.7
+        general_box[1] *= 2.2
+        general_box[3] *= 2.2
+        draw.rectangle(general_box, outline=COLORS[label], width=2)
+        if id2label:
+            draw.text((general_box[0] + 10, general_box[1] - 10), id2label[label], fill=COLORS[label], font=font)
+    
+    image.show()

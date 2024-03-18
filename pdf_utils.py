@@ -35,7 +35,6 @@ def within_bbox(bbox_bound, bbox_in):
 
     return iou > 0.95
 
-
 def extract_tokens_from_page(page):
     tokens = []
     
@@ -105,10 +104,7 @@ def extract_tokens_from_page(page):
         tokens.append((word_text,) + figure_bbox + (fontname,))
     
     return tokens
-    
-    
 
-    
 def save_images(data_dir, path):
     
     pdf_name = path[:-4]
@@ -127,8 +123,6 @@ def save_tokens(tokens, page_num, pdf_dir, pdf_name):
     with open(os.path.join(pdf_dir, pdf_name + f'_{page_num}.txt'), 'w', encoding='utf8') as f:
         for token in tokens:
             f.write('\t'.join(token) + '\n')
-
-    
 
 def extract_pages_from_pdf(data_dir, path):
     if path[-3:] != 'pdf':

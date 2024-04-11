@@ -73,13 +73,6 @@ class DocBankNoImageDataset(torch.utils.data.Dataset):
 def collate_fn_docbank(tokens, bboxes, labels):
     pass
 
-Here's a SpbuDataset class that loads the CSV files and PDF paths from the specified folders:
-
-
-import os
-import pandas as pd
-from typing import Tuple
-
 class SpbuDataset:
     def __init__(self, data_dir: str = os.path('data', 'spbu', 'latex')):
         self.data_dir = data_dir

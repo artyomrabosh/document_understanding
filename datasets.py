@@ -73,13 +73,37 @@ class DocBankNoImageDataset(torch.utils.data.Dataset):
 def collate_fn_docbank(tokens, bboxes, labels):
     pass
 
-class SpbuDataset(Dataset):
+Here's a SpbuDataset class that loads the CSV files and PDF paths from the specified folders:
 
-    def __init__(self, data_dir):
-        pass
 
-    def __len__(self):
-        pass
-    
-    def __getitem__(self, idx):
-        pass
+import os
+import pandas as pd
+from typing import Tuple
+
+class SpbuDataset:
+    def __init__(self, data_dir: str = os.path('data', 'spbu', 'latex')):
+        self.data_dir = data_dir
+        self.folders = self._get_folders()
+        self.data = self._load_data()
+
+    def _get_folders(self) -> list:
+        return [folder for folder in os.listdir(self.data_dir) if folder.startswith('work_')]
+
+    def _load_data(self) -> list:
+        data = []
+
+        for folder in self.folders:
+            folder_path = os.path.join(self.data_dir, folder)
+            df = pd.read_csv(os.path.join(folder_path, 'df.csv'), sep='\t')
+            df_toc = pd.read_csv(os.path.join(folder_path, 'df_toc.csv'), sep='\t')
+            pdf_path = os.path.join(folder_path, f'{folder}.pdf')
+
+            data.append((df, df_toc, pdf_path))
+
+        return data
+
+    def __len__(self) -> int:
+        return len(self.data)
+
+    def __getitem__(self, idx: int) -> Tuple[pd.DataFrame, pd.DataFrame, str]:
+        return self.data[idx]

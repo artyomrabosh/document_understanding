@@ -1,6 +1,7 @@
 from torch.utils.data import Dataset, DataLoader, Sampler
 from transformers import RobertaTokenizerFast
 import os
+import pandas as pd
 from typing import List, Tuple
     
 
@@ -74,7 +75,7 @@ def collate_fn_docbank(tokens, bboxes, labels):
     pass
 
 class SpbuDataset:
-    def __init__(self, data_dir: str = os.path('data', 'spbu', 'latex')):
+    def __init__(self, data_dir: str = os.path.join('data', 'spbu', 'latex')):
         self.data_dir = data_dir
         self.folders = self._get_folders()
         self.data = self._load_data()
@@ -87,8 +88,8 @@ class SpbuDataset:
 
         for folder in self.folders:
             folder_path = os.path.join(self.data_dir, folder)
-            df = pd.read_csv(os.path.join(folder_path, 'df.csv'), sep='\t')
-            df_toc = pd.read_csv(os.path.join(folder_path, 'df_toc.csv'), sep='\t')
+            df = pd.read_csv(os.path.join(folder_path, 'text.csv'), sep='\t')
+            df_toc = pd.read_csv(os.path.join(folder_path, 'toc.csv'), sep='\t')
             pdf_path = os.path.join(folder_path, f'{folder}.pdf')
 
             data.append((df, df_toc, pdf_path))

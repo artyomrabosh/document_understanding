@@ -75,15 +75,38 @@ def collate_fn_docbank(tokens, bboxes, labels):
     pass
 
 class SpbuDataset:
+    """
+    A custom dataset class to load SPBU data, which consists of text CSV files, table of contents CSV files,
+    and corresponding PDF files.
+    """
+
     def __init__(self, data_dir: str = os.path.join('data', 'spbu', 'latex')):
+        """
+        Initialize the SpbuDataset object.
+
+        Args:
+            data_dir (str, optional): The path to the directory containing the SPBU data. Defaults to os.path.join('data', 'spbu', 'latex').
+        """
         self.data_dir = data_dir
         self.folders = self._get_folders()
         self.data = self._load_data()
 
-    def _get_folders(self) -> list:
+    def _get_folders(self) -> List[str]:
+        """
+        Get a list of folders in the data directory that start with 'work_'.
+
+        Returns:
+            List[str]: A list of folder names.
+        """
         return [folder for folder in os.listdir(self.data_dir) if folder.startswith('work_')]
 
-    def _load_data(self) -> list:
+    def _load_data(self) -> List[Tuple[pd.DataFrame, pd.DataFrame, str]]:
+        """
+        Load the data from the text and table of contents CSV files and store the corresponding PDF paths.
+
+        Returns:
+            List[Tuple[pd.DataFrame, pd.DataFrame, str]]: A list of tuples containing text DataFrame, table of contents DataFrame, and PDF path.
+        """
         data = []
 
         for folder in self.folders:
@@ -97,7 +120,22 @@ class SpbuDataset:
         return data
 
     def __len__(self) -> int:
+        """
+        Get the length of the dataset.
+
+        Returns:
+            int: The number of items in the dataset.
+        """
         return len(self.data)
 
     def __getitem__(self, idx: int) -> Tuple[pd.DataFrame, pd.DataFrame, str]:
+        """
+        Get the item at the specified index.
+
+        Args:
+            idx (int): The index of the item to retrieve.
+
+        Returns:
+            Tuple[pd.DataFrame, pd.DataFrame, str]: A tuple containing text DataFrame, table of contents DataFrame, and PDF path.
+        """
         return self.data[idx]

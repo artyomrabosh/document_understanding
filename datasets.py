@@ -10,7 +10,7 @@ def pdf_to_tokens(path: str) -> list:
     pass
 
 
-class DocBankNoImageDataset(torch.utils.data.Dataset):
+class DocBankNoImageDataset(Dataset):
     @staticmethod
     def get_vocab(labels: List[List[str]]) -> Tuple[dict, dict]:
         labels_set = set([label for page in labels for label in page])

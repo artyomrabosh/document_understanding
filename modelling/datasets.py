@@ -6,12 +6,8 @@ from typing import List, Tuple, Dict
 import torch
 import pdfplumber
 import bisect
+import numpy as np 
 
-from vila.utils import replace_unicode_tokens
-from vila.utils import replace_unicode_tokens
-from vila.predictors import normalize_bbox
-
-from vila.predictors import HierarchicalPDFPredictor
 
 label2id = {
     'paragraph': 0,
@@ -29,6 +25,22 @@ label2id = {
     'figure': 12,
     'service': 12
     }
+
+def fill_with_nearest_label(row, pagedata: pd.DataFrame):
+    if pd.isna(row['label']):
+        # Find the index of the current row
+        current_index = pagedata.index[pagedata['token'] == row['token']].tolist()[0]
+
+        # Find the index of the next non-NaN token
+        next_non_nan_index = pagedata[current_index:].first_valid_index('label')
+
+        if next_non_nan_index is not None:
+            # Return the label of the next non-NaN token
+            return pagedata.loc[next_non_nan_index, 'label']
+        else:
+            return 'Service'  # or another default label if there are no more non-NaN tokens
+    else:
+        return row['label']
 
 class DocBankNoImageDataset(Dataset):
     @staticmethod
@@ -182,7 +194,25 @@ class SpbuDataset:
         pagedata = df[df['page'] == page_number]
 
         if len(pagedata) > 0:
-            pagedata = pagedata.fillna('Service')
+            ##### pagedata = pagedata.fillna('Service')
+
+            def fill_with_nearest_label(row, pagedata: pd.DataFrame = pagedata):
+                if pd.isna(row['label']):
+                    # Find the index of the current row
+                    current_index = pagedata.index[pagedata['token'] == row['token']].tolist()[0]
+                
+                    # Find the index of the next non-NaN token
+                    next_non_nan_index = df['label'][current_index:].first_valid_index()
+                    print(next_non_nan_index)
+                    if next_non_nan_index is not None:
+                        # Return the label of the next non-NaN token
+                        return df.loc[next_non_nan_index, 'label']
+                    else:
+                        return 'Service'  # or another default label if there are no more non-NaN tokens
+                else:
+                    return row['label']
+
+            pagedata['label'] = pagedata.apply(fill_with_nearest_label, axis=1)
 
             page = {
                 "words": list(pagedata['token']),

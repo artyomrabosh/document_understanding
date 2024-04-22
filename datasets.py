@@ -3,9 +3,32 @@ from transformers import RobertaTokenizerFast
 import os
 import pandas as pd
 from typing import List, Tuple
-    
+import torch
+import pdfplumber
+import bisect
 
+from vila.utils import replace_unicode_tokens
+from vila.utils import replace_unicode_tokens
+from vila.predictors import normalize_bbox
 
+from vila.predictors import HierarchicalPDFPredictor
+
+label2id = {
+    'paragraph': 0,
+    'title': 1,
+    'equation': 2,
+    'reference': 3,
+    'section': 4,
+    'list': 5,
+    'table': 6,
+    'caption': 7,
+    'author': 8,
+    'abstract': 9,
+    'footer': 10,
+    'date': 11,
+    'figure': 12,
+    'service': 12
+    }
 
 def pdf_to_tokens(path: str) -> list:
     pass
@@ -74,6 +97,33 @@ class DocBankNoImageDataset(Dataset):
 def collate_fn_docbank(tokens, bboxes, labels):
     pass
 
+pdf_predictor = HierarchicalPDFPredictor.from_pretrained("allenai/hvila-block-layoutlm-finetuned-docbank")
+
+
+def preprocess_pdf_data(pdf_data, page_size, replace_empty_unicode):
+    _labels = pdf_data.get("labels")
+    pdf_data["labels"] = [label2id[l.lower()] for l in _labels]
+    page_width, page_height = page_size
+    _words = pdf_data["words"]
+    if replace_empty_unicode:
+        pdf_data["words"] = replace_unicode_tokens(
+            pdf_data["words"],
+            False,
+            "[UNK]",
+        )
+
+    _bbox = pdf_data["bbox"]
+    pdf_data["bbox"] = [
+        normalize_bbox(box, page_width, page_height) for box in pdf_data["bbox"]
+    ]
+    sample = pdf_predictor.preprocessor.preprocess_sample(pdf_data)
+
+    # Change back to the original pdf_data
+    pdf_data["words"] = _words
+    pdf_data["bbox"] = _bbox
+
+    return sample
+
 class SpbuDataset:
     """
     A custom dataset class to load SPBU data, which consists of text CSV files, table of contents CSV files,
@@ -90,6 +140,18 @@ class SpbuDataset:
         self.data_dir = data_dir
         self.folders = self._get_folders()
         self.data = self._load_data()
+
+        self.cumulative_pages = [0]
+        self.page_sizes = []
+
+        for item in self.data:
+            df, _, pdf_path = item
+            self.cumulative_pages.append(self.cumulative_pages[-1] + len(df['page'].unique()))
+            with pdfplumber.open(pdf_path) as doc:
+                for page in doc.pages:
+                    width, height = page.width, page.height
+                    self.page_sizes.append((width, height))
+
 
     def _get_folders(self) -> List[str]:
         """
@@ -128,14 +190,40 @@ class SpbuDataset:
         """
         return len(self.data)
 
-    def __getitem__(self, idx: int) -> Tuple[pd.DataFrame, pd.DataFrame, str]:
+    def __getitem__(self, idx: int) -> Tuple[Dict[str, List], Tuple[int, int]]:
         """
-        Get the item at the specified index.
+        Retrieve tokens and other data for a specific global page index.
 
         Args:
-            idx (int): The index of the item to retrieve.
+            idx (int): The global page index to retrieve data for.
 
         Returns:
-            Tuple[pd.DataFrame, pd.DataFrame, str]: A tuple containing text DataFrame, table of contents DataFrame, and PDF path.
+            page (Dict[str, List]): A dictionary containing tokens and other data from the specified page.
+            page_size (Tuple[int, int]): The dimensions of the specified page.
         """
-        return self.data[idx]
+        if not isinstance(idx, int) or idx < 0 or idx >= self.cumulative_pages[-1]:
+            raise IndexError("Invalid index. Expected a non-negative integer less than the total number of pages.")
+
+        # Find the item and the local page number corresponding to the global page index
+        item_idx = bisect.bisect_right(self.cumulative_pages, idx) - 1
+        page_number = idx - self.cumulative_pages[item_idx] + 1
+        page_size = self.page_sizes[idx]
+
+        df, df_toc, pdf_path = self.data[item_idx]
+
+        # Find the rows where the page number matches
+        pagedata = df[df['page'] == page_number]
+
+        if len(pagedata) > 0:
+            pagedata = pagedata.fillna('Service')
+
+            page = {
+                "words": list(pagedata['token']),
+                "labels": list(pagedata['label']),
+                "block_ids": list(pagedata['block_id']),
+                "bbox": [t for t in zip(pagedata.x0, pagedata.y0, pagedata.x1, pagedata.y1)],
+            }
+
+            return page, page_size
+
+        raise ValueError(f"Page {page_number} not found in item {item_idx} of the dataset.")

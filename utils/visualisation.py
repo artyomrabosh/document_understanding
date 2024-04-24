@@ -34,7 +34,7 @@ def draw_token(rect: Dict[str, Any], im_origin) -> None:
         stroke=color,
         stroke_width=1
     )
-    
+
 def show_page(pdf_path: str, page: int = 1, tokens: Optional[DataFrame] = None) -> None:
     """
     Show the specified PDF page with bounding boxes around tokens (if tokens are provided).

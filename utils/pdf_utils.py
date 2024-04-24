@@ -9,6 +9,8 @@ from tqdm import tqdm
 from collections import Counter
 from vila.pdftools.pdfplumber_extractor import PDFPlumberTokenExtractor
 from vila.pdftools.pdf_extractor import PDFExtractor
+import layoutparser as lp
+import pandas as pd
 
 COLORS = ['blue', 'green', 'orange', 'violet', 'red', 'brown']
 # data_dir = os.path.join('data', 'spbu', 'pdf')
@@ -20,19 +22,14 @@ def load_tokens_labeled(work_path):
 
 class TrainingPDFExtractor(PDFExtractor):
     def __init__(self, pdf_extractor_name, **kwargs):
-        pass
+        self.vision_model = lp.EfficientDetLayoutModel("lp://PubLayNet", 
+                                                       extra_config={"output_confidence_threshold": 0.1}) 
 
         
     def load_tokens_and_image(
-        self, pdf_path: str, resize_image=False, resize_layout=False, dpi=72, **kwargs):
-
-        pdf_tokens = self.pdf_extractor(pdf_path, **kwargs)
-        page_images = pdf2image.convert_from_path(pdf_path, dpi=dpi)
-
-        assert not (
-            resize_image and resize_layout
-        ), "You could not resize image and layout simultaneously."
-
+        self, work_idx: int, **kwargs):
+        ground_truth = pd.read_csv(f'data/spbu/latex/work_{work_idx}/text.csv', sep='\t', index_col=0)
+        
         if resize_layout:
             for image, page in zip(page_images, pdf_tokens):
                 width, height = image.size

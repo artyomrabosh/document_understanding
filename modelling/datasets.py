@@ -188,14 +188,12 @@ class SpbuDataset:
         page_number = idx - self.cumulative_pages[item_idx] + 1
         page_size = self.page_sizes[idx]
 
-        df, df_toc, pdf_path = self.data[item_idx]
+        df, _, _ = self.data[item_idx]
 
         # Find the rows where the page number matches
         pagedata = df[df['page'] == page_number]
 
         if len(pagedata) > 0:
-            ##### pagedata = pagedata.fillna('Service')
-
             def fill_with_nearest_label(row, pagedata: pd.DataFrame = pagedata):
                 if pd.isna(row['label']):
                     # Find the index of the current row
@@ -203,16 +201,16 @@ class SpbuDataset:
                 
                     # Find the index of the next non-NaN token
                     next_non_nan_index = df['label'][current_index:].first_valid_index()
-                    print(next_non_nan_index)
                     if next_non_nan_index is not None:
                         # Return the label of the next non-NaN token
-                        return df.loc[next_non_nan_index, 'label']
+                        new_label = df.loc[next_non_nan_index, 'label']
+                        new_block_id = df.loc[next_non_nan_index, 'block_id']
+                        return new_label, new_block_id 
                     else:
-                        return 'Service'  # or another default label if there are no more non-NaN tokens
+                        return 'Service', -1  # or another default label if there are no more non-NaN tokens
                 else:
-                    return row['label']
-
-            pagedata['label'] = pagedata.apply(fill_with_nearest_label, axis=1)
+                    return row['label'], row['block_id']
+            pagedata['label'], pagedata['block_id'] = zip(*pagedata.apply(fill_with_nearest_label, axis=1))
 
             page = {
                 "words": list(pagedata['token']),

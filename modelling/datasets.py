@@ -192,7 +192,7 @@ class SpbuDataset:
 
         # Find the rows where the page number matches
         pagedata = df[df['page'] == page_number]
-
+        pagedata.loc[pagedata['token'].isna(), 'token'] = 'Figure'
         if len(pagedata) > 0:
             def fill_with_nearest_label(row, pagedata: pd.DataFrame = pagedata):
                 if pd.isna(row['label']):
@@ -210,7 +210,8 @@ class SpbuDataset:
                         return 'Service', -1  # or another default label if there are no more non-NaN tokens
                 else:
                     return row['label'], row['block_id']
-            pagedata['label'], pagedata['block_id'] = zip(*pagedata.apply(fill_with_nearest_label, axis=1))
+            # pagedata['label'], pagedata['block_id'] = zip(*pagedata.apply(fill_with_nearest_label, axis=1))
+            pagedata[['label', 'block_id']] = pagedata.apply(fill_with_nearest_label, axis=1, result_type="expand")
 
             page = {
                 "words": list(pagedata['token']),

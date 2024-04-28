@@ -6,6 +6,10 @@ from vila import HierarchicalPDFPredictor
 from tqdm import tqdm
 from sklearn.metrics import classification_report
 
+model_config = {
+    'trainable_params': ['classifier', 'layout_encoder', 'text_encoder']
+}
+
 def train_step(model: torch.nn.Module, inputs: torch.Tensor, optimizer: torch.optim.Optimizer, device: str) -> torch.Tensor:
     """
     Perform a single training step.
@@ -27,6 +31,16 @@ def compute_metrics(preds, labels):
     print(classification_report(labels, preds, zero_division=0.0))
     return
 
+def set_training_parameters(predictor, model_config):
+    trainable_params = model_config['trainable_params']
+    if "classifier" in trainable_params:
+        predictor.model.classifier.train()
+    if "text_encoder" in trainable_params:
+        predictor.model.hierarchical_model.textline_encoder.train()
+    if "layout_encoder" in trainable_params:
+        predictor.model.hierarchical_model.textline_model.train()
+
+
 def train_epoch(predictor: HierarchicalPDFPredictor, 
                 dataloader: DataLoader, 
                 optimizer: Optimizer, 
@@ -47,8 +61,6 @@ def train_epoch(predictor: HierarchicalPDFPredictor,
     optimizer.zero_grad()
     step = 0
     for i, item in enumerate(pbar):
-        if i == 50:
-            break
         page, page_size = item
         model_inputs = predictor.preprocess_pdf_data(page, page_size, False)
         del page
@@ -77,8 +89,6 @@ def validate(predictor: HierarchicalPDFPredictor, dataloader: DataLoader):
     preds, labels = [], []
 
     for i, item in enumerate(pbar):
-        if i<50:
-            continue
         page, page_size = item
         model_inputs = predictor.preprocess_pdf_data(page, page_size, False)
         batched_inputs = predictor.model_input_collator(model_inputs, 1)
@@ -114,4 +124,3 @@ def train(predictor: HierarchicalPDFPredictor, dataloader: DataLoader, num_epoch
     optimizer = AdamW(predictor.model.parameters(), lr=0.0001)
     for _ in range(num_epoch):
         train_epoch(predictor, dataloader, optimizer, device)
-        # validate(predictor, dataloader)

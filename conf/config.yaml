@@ -1,0 +1,4 @@
+defaults:
+  - model: ddpm
+  - optimizer: adam
+  - training

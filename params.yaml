@@ -1,0 +1,10 @@
+model:
+  name: vila
+  trainable_params: ['classifier', 'layout_encoder', 'text_encoder']
+optimizer:
+  name: adam
+  lr: 5.0e-05
+  accumulation_grad_steps: 32
+training:
+  num_epochs: 20
+  device: cuda:4

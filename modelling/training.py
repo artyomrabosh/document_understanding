@@ -4,13 +4,21 @@ from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from vila import HierarchicalPDFPredictor
 from tqdm import tqdm
+
+from typing import List
+
+import wandb
+
 from sklearn.metrics import classification_report
 
 model_config = {
     'trainable_params': ['classifier', 'layout_encoder', 'text_encoder']
 }
 
-def train_step(model: torch.nn.Module, inputs: torch.Tensor, optimizer: torch.optim.Optimizer, device: str) -> torch.Tensor:
+def train_step(model: torch.nn.Module, 
+               inputs: torch.Tensor, 
+               optimizer: torch.optim.Optimizer, 
+               device: torch.device) -> torch.Tensor:
     """
     Perform a single training step.
 
@@ -29,11 +37,11 @@ def train_step(model: torch.nn.Module, inputs: torch.Tensor, optimizer: torch.op
     return model_outputs.loss
 
 def compute_metrics(preds, labels):
-    print(classification_report(labels, preds, zero_division=0.0))
-    return
+    report = classification_report(labels, preds, zero_division=0.0, output_dict=True)
+    wandb.log(report)
 
-def set_training_parameters(predictor, model_config):
-    trainable_params = model_config['trainable_params']
+def set_training_parameters(predictor: HierarchicalPDFPredictor, 
+                            trainable_params: List[str]):
     if "classifier" in trainable_params:
         predictor.model.classifier.train()
     if "text_encoder" in trainable_params:
@@ -48,8 +56,8 @@ def set_training_parameters(predictor, model_config):
 def train_epoch(predictor: HierarchicalPDFPredictor, 
                 dataloader: DataLoader, 
                 optimizer: Optimizer, 
-                device: torch.device, 
-                accumulation_grad_steps: int = 10) -> None:
+                device: torch.device = torch.device('cpu'), 
+                accumulation_grad_steps: int = 32) -> None:
     """
     Train the model for a single epoch.
 
@@ -75,12 +83,15 @@ def train_epoch(predictor: HierarchicalPDFPredictor,
             train_loss = train_step(predictor.model, batch, optimizer, device)
             step += 1
             if step % accumulation_grad_steps == 0:
+                wandb.log({"train loss": train_loss})
                 optimizer.step()
                 optimizer.zero_grad()
         loss_ema = train_loss if loss_ema is None else 0.9 * loss_ema + 0.1 * train_loss
         pbar.set_description(f"loss: {loss_ema:.4f}")
 
-def validate(predictor: HierarchicalPDFPredictor, dataloader: DataLoader, device: str = 'cpu'):
+def validate(predictor: HierarchicalPDFPredictor, 
+             dataloader: DataLoader, 
+             device: torch.device = torch.device('cpu')):
     """
     Validate the model on the validation set.
 
@@ -101,17 +112,14 @@ def validate(predictor: HierarchicalPDFPredictor, dataloader: DataLoader, device
         model_predictions = []
         batch_losses = []
         for batch in batched_inputs:
+            batch = {k: v.to(device) for k, v in batch.items()}
             model_outputs = predictor.model(**batch)
             batch_losses.append(model_outputs.loss)
             model_predictions.append(predictor.get_category_prediction(model_outputs))
         model_predictions = predictor.postprocess_model_outputs(page, model_inputs, model_predictions, 'list')
-        # print(page['labels'])
-        # print(model_predictions)
-        
         model_predictions = [predictor.id2label[pred] for pred in model_predictions]
         item_labels = [predictor.id2label[label] for label in page['labels']]
 
-        # print(item_labels, model_predictions)
         preds.extend(model_predictions)
         labels.extend(item_labels)
     compute_metrics(preds, labels)

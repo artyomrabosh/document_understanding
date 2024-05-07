@@ -23,6 +23,7 @@ def train_step(model: torch.nn.Module, inputs: torch.Tensor, optimizer: torch.op
     Returns:
         torch.Tensor: The loss tensor.
     """
+    inputs = {key: value.to(device) for key, value in inputs.items()}
     model_outputs = model(**inputs)
     model_outputs.loss.backward()
     return model_outputs.loss
@@ -39,13 +40,16 @@ def set_training_parameters(predictor, model_config):
         predictor.model.hierarchical_model.textline_encoder.train()
     if "layout_encoder" in trainable_params:
         predictor.model.hierarchical_model.textline_model.train()
+    if "layout_embeddings" in trainable_params:
+        predictor.model.hierarchical_model.textline_model.embeddings.train()
+
 
 
 def train_epoch(predictor: HierarchicalPDFPredictor, 
                 dataloader: DataLoader, 
                 optimizer: Optimizer, 
-                device: str, 
-                accumulation_grad_steps: int = 5) -> None:
+                device: torch.device, 
+                accumulation_grad_steps: int = 10) -> None:
     """
     Train the model for a single epoch.
 
@@ -60,7 +64,7 @@ def train_epoch(predictor: HierarchicalPDFPredictor,
     loss_ema = None
     optimizer.zero_grad()
     step = 0
-    for i, item in enumerate(pbar):
+    for _, item in enumerate(pbar):
         page, page_size = item
         model_inputs = predictor.preprocess_pdf_data(page, page_size, False)
         del page
@@ -76,7 +80,7 @@ def train_epoch(predictor: HierarchicalPDFPredictor,
         loss_ema = train_loss if loss_ema is None else 0.9 * loss_ema + 0.1 * train_loss
         pbar.set_description(f"loss: {loss_ema:.4f}")
 
-def validate(predictor: HierarchicalPDFPredictor, dataloader: DataLoader):
+def validate(predictor: HierarchicalPDFPredictor, dataloader: DataLoader, device: str = 'cpu'):
     """
     Validate the model on the validation set.
 
@@ -84,11 +88,13 @@ def validate(predictor: HierarchicalPDFPredictor, dataloader: DataLoader):
         predictor (PDFPredictor): The predictor object containing the model and preprocessing functions.
         dataloader (DataLoader): The DataLoader to use for validation.
     """
+    device = torch.device(device)
     predictor.model.eval()
+    predictor.model.to(device)
     pbar = tqdm(dataloader)
     preds, labels = [], []
 
-    for i, item in enumerate(pbar):
+    for _, item in enumerate(pbar):
         page, page_size = item
         model_inputs = predictor.preprocess_pdf_data(page, page_size, False)
         batched_inputs = predictor.model_input_collator(model_inputs, 1)
@@ -111,7 +117,7 @@ def validate(predictor: HierarchicalPDFPredictor, dataloader: DataLoader):
     compute_metrics(preds, labels)
 
 
-def train(predictor: HierarchicalPDFPredictor, dataloader: DataLoader, num_epoch: int, device: str):
+def train(predictor: HierarchicalPDFPredictor, dataloader: DataLoader, num_epoch: int, device: str = 'cpu'):
     """
     Train the model for a specified number of epochs.
 
@@ -122,5 +128,8 @@ def train(predictor: HierarchicalPDFPredictor, dataloader: DataLoader, num_epoch
         device (str): The device to use for computation ('cpu' or 'cuda').
     """
     optimizer = AdamW(predictor.model.parameters(), lr=0.0001)
+    device = torch.device(device)
+    predictor.model.to(device)
+
     for _ in range(num_epoch):
         train_epoch(predictor, dataloader, optimizer, device)

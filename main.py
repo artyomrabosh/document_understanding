@@ -1,13 +1,13 @@
 import datetime
 import wandb
-import hydra
 from omegaconf import DictConfig
 from ruamel.yaml import YAML
 import torch
+from torch.utils.data.dataloader import DataLoader
 
 from os import path
 
-from modelling.datasets import SpbuDataset
+from modelling.datasets import SpbuDataset, single_item_collate_fn
 from modelling.predictors import SpbuPredictor
 from modelling.training import set_training_parameters
 from modelling.training import validate
@@ -46,7 +46,11 @@ def main():
     train_path = path.join('data', 'spbu', 'latex', 'train')
     val_path = path.join('data', 'spbu', 'latex', 'val')
 
-    train_loader = SpbuDataset(train_path)
+    train_loader =DataLoader(SpbuDataset(train_path),
+                             batch_size=1,
+                             shuffle=True,
+                             collate_fn=single_item_collate_fn)
+    
     val_loader = SpbuDataset(val_path)
 
     set_training_parameters(predictor, cfg.model.trainable_params)
@@ -54,6 +58,14 @@ def main():
         case "adam":
             optim = torch.optim.Adam(predictor.model.parameters(), 
                                      lr=cfg.optimizer.lr)
+            
+    match cfg.scheduler.name:
+        case "Exponential":
+            scheduler = torch.optim.lr_scheduler.ExponentialLR(optim, gamma=0.9)
+        case "Linear":
+            scheduler = torch.optim.lr_scheduler.LinearLR(optim, 
+                                                          start_factor=1.0, 
+                                                          end_factor=0.33)
     
     for _ in range(cfg.training.num_epochs):
         train_epoch(predictor=predictor, 
@@ -62,6 +74,7 @@ def main():
                     device=device, 
                     accumulation_grad_steps=cfg.optimizer.accumulation_grad_steps)
         validate(predictor, val_loader, device) 
+        scheduler.step()
         wandb.log({'lr': get_current_lr(optim)})
 
 

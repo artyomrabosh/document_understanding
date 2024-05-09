@@ -1,2 +1,2 @@
 name: "vila"
-trainable_params: ['classifier', 'layout_encoder', 'text_encoder']
+trainable_params: ['classifier', 'layout_embeddings']
